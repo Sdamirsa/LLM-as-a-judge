@@ -46,15 +46,16 @@ class JudgmentLLM(LLM):
 }
 
     def __init__(
-        self,
-        api_key: Optional[str] = None,
-        model: str = "gpt-4o",
-        temperature: float = 0.7,
-        max_tokens: int = 2048,
-        option: str = None,
-        user_prompt: bool = False,
-        grading_type: str = None,
-        system_prompt: str = None):
+    self,
+    api_key: Optional[str] = None,
+    model: str = "gpt-4o",
+    temperature: float = 0.7,
+    max_tokens: int = 2048,
+    option: str = None,
+    user_prompt: bool = False,
+    grading_type: str = None,
+    system_prompt: str = None,
+    add_to_system_prompt: str = None):
         """
         Initializes the JudgmentLLM object.
 
@@ -64,8 +65,12 @@ class JudgmentLLM(LLM):
             temperature (float): Controls response randomness.
             max_tokens (int): The maximum number of tokens in the response.
             option (str): Required judgment type, must be one of: "boolean_judgment", "discrepancy_judgment", "fact_check_judgment".
+            user_prompt (bool): Whether to use user-provided prompts.
+            grading_type (str): The type of grading to use.
+            system_prompt (str, optional): Override the default system prompt entirely.
+            add_to_system_prompt (str, optional): Additional text to append to the default system prompt.
         Raises:
-            ValueError: If the 'option' is invalid.
+            ValueError: If the 'option' is invalid or if both system_prompt and add_to_system_prompt are provided.
         """
         super().__init__(api_key=api_key, model=model, temperature=temperature, max_tokens=max_tokens)
         self.load_prompts()
@@ -74,15 +79,26 @@ class JudgmentLLM(LLM):
         self.user_prompt = user_prompt
         self.grading_type = self._validate_grading_type(grading_type)
         self.grading_prompt = self.GRADING_PROMPTS[self.grading_type]
-        self.system_prompt = system_prompt
-        if not user_prompt:
-            if self.system_prompt is None:
-                self.system_prompt = self.PROMPTS[self.option]
-        else:
-            if self.system_prompt is None:
-                self.system_prompt = self.PROMPTS[f'{self.option}_with_user_prompt']
-        self.response_model = self._get_response_model(self.grading_type)
         
+        # Handle system prompt configuration
+        if system_prompt is not None and add_to_system_prompt is not None:
+            raise ValueError("Cannot provide both system_prompt and add_to_system_prompt. Choose one.")
+        
+        base_prompt = None
+        if not user_prompt:
+            base_prompt = self.PROMPTS[self.option]
+        else:
+            base_prompt = self.PROMPTS[f'{self.option}_with_user_prompt']
+        
+        if system_prompt is not None:
+            self.system_prompt = system_prompt
+        elif add_to_system_prompt is not None:
+            self.system_prompt = f"{base_prompt}\n\n{add_to_system_prompt}"
+        else:
+            self.system_prompt = base_prompt
+            
+        self.response_model = self._get_response_model(self.grading_type)
+            
 
     @staticmethod
     def _validate_option(option: str) -> str:
