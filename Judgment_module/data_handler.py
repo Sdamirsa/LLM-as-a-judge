@@ -1,7 +1,7 @@
 
 
 import pandas as pd  # type: ignore
-from typing import List
+from typing import List,Union, Optional
 from Judgment_module.LLM_judge import JudgmentLLM
 import logging # type: ignore
 import asyncio
@@ -12,8 +12,17 @@ logger = logging.getLogger(__name__)
 
 class DataHandler:
     """
-    A class to handle reading and processing data from files,
-    and operating on DataFrames.
+            A class to handle reading and processing data from various input sources,
+            including files and DataFrames.
+
+            Input Types Supported:
+            1. pandas DataFrame: Pass your existing DataFrame directly
+            2. CSV files: Provide path to a .csv file
+            3. Excel files: Provide path to a .xls or .xlsx file
+
+            The class can either:
+            - Automatically detect the input type from file extensions
+            - Use explicitly specified input type via the input_type parameter
     """
 
     def __init__(self,judgment):
@@ -25,6 +34,79 @@ class DataHandler:
             raise TypeError("you must pass an instance of JudgmentLLM")
         else:
             self.judgment = judgment
+    
+    def read_input(self, input_source: Union[str, pd.DataFrame], input_type: Optional[str] = None) -> pd.DataFrame:
+        """
+        Reads data from various input sources and returns a DataFrame.
+
+        Parameters:
+            input_source (Union[str, pd.DataFrame]): The input source. Can be either:
+                - A pandas DataFrame object
+                - A string path to a CSV file
+                - A string path to an Excel file (.xls or .xlsx)
+            
+            input_type (Optional[str]): Type of input. Allowed values:
+                - 'csv': For CSV files
+                - 'excel': For Excel files
+                - 'dataframe': For pandas DataFrame objects
+                - None: Will attempt to auto-detect from file extension
+
+        Returns:
+            pd.DataFrame: A pandas DataFrame containing the data
+
+        Raises:
+            ValueError: If input type is not supported or cannot be determined
+            FileNotFoundError: If the specified file does not exist
+            pd.errors.EmptyDataError: If the input file is empty
+
+        Examples:
+            # Using with a DataFrame
+            df = pd.DataFrame({'col1': [1, 2], 'col2': [3, 4]})
+            handler.read_input(df)
+
+            # Using with a CSV file (auto-detect)
+            handler.read_input('path/to/file.csv')
+
+            # Using with an Excel file (explicit type)
+            handler.read_input('path/to/file.xlsx', input_type='excel')
+        """
+        if isinstance(input_source, pd.DataFrame):
+            return input_source
+
+        if isinstance(input_source, str):
+            if input_type is None:
+                # Try to infer input type from file extension
+                _, file_extension = os.path.splitext(input_source)
+                file_extension = file_extension.lower()
+                
+                if file_extension == '.csv':
+                    input_type = 'csv'
+                elif file_extension in ['.xls', '.xlsx']:
+                    input_type = 'excel'
+                else:
+                    raise ValueError(
+                        f"Could not determine input type from extension: {file_extension}. "
+                        "Please explicitly specify input_type as 'csv' or 'excel'"
+                    )
+
+            try:
+                if input_type == 'csv':
+                    return self.read_csv(input_source)
+                elif input_type == 'excel':
+                    return self.read_excel(input_source)
+                else:
+                    raise ValueError(
+                        f"Unsupported input type: {input_type}. "
+                        "Supported types are: 'csv', 'excel', or pandas DataFrame"
+                    )
+            except Exception as e:
+                logger.error(f"Error reading input: {e}")
+                raise
+
+        raise ValueError(
+            "Input source must be either a pandas DataFrame or a file path string. "
+            "For files, supported formats are CSV (.csv) and Excel (.xls, .xlsx)"
+        )
 
     def read_csv(self, file_path: str) -> pd.DataFrame:
         """
@@ -173,24 +255,94 @@ class DataHandler:
             task = asyncio.create_task(self.judgment.generate_judgment_async(row_values_list))
             tasks.append(task)
         return tasks
-    async def run_judgment_pipline_async(self, input_path,string_list,save_path):
-        df = self.read_file(input_path)
+    async def run_judgment_pipline_async(self, 
+                                       input_source: Union[str, pd.DataFrame],
+                                       string_list: List[str],
+                                       save_path: str,
+                                       input_type: Optional[str] = None) -> tuple:
+        """
+        Run the async judgment pipeline with flexible input handling.
+
+        Parameters:
+            input_source (Union[str, pd.DataFrame]): The input source. Can be:
+                - A pandas DataFrame object
+                - A string path to a CSV file
+                - A string path to an Excel file
+            string_list (List[str]): List of column names to process
+            save_path (str): Path where the output CSV will be saved
+            input_type (Optional[str]): Type of input ('csv', 'excel', 'dataframe').
+                                      If None, will try to infer from file extension.
+
+        Returns:
+            tuple: (results, processed_dataframe)
+
+        Examples:
+            # Using with a CSV file
+            results, df = await handler.run_judgment_pipline_async(
+                'data.csv',
+                ['col1', 'col2'],
+                'output.csv'
+            )
+
+            # Using with a DataFrame
+            results, df = await handler.run_judgment_pipline_async(
+                my_dataframe,
+                ['col1', 'col2'],
+                'output.csv'
+            )
+        """
+        df = self.read_input(input_source, input_type)
         self.specify_columns(string_list)
         df_new = self.decompose_df(df)
-        res =  await self.process_df_async(df_new)
-        df_new = self.create_judgment_df(res,df_new)
-        self.save_df(df_new,save_path)
-        return res,df_new
-    
-    def run_judgment_pipeline(self,input_path,string_list,save_path):
-        df = self.read_file(input_path)
-        self.specify_columns( string_list)
+        res = await self.process_df_async(df_new)
+        df_new = self.create_judgment_df(res, df_new)
+        self.save_df(df_new, save_path)
+        return res, df_new
+
+    def run_judgment_pipeline(self,
+                            input_source: Union[str, pd.DataFrame],
+                            string_list: List[str],
+                            save_path: str,
+                            input_type: Optional[str] = None) -> tuple:
+        """
+        Run the synchronous judgment pipeline with flexible input handling.
+
+        Parameters:
+            input_source (Union[str, pd.DataFrame]): The input source. Can be:
+                - A pandas DataFrame object
+                - A string path to a CSV file
+                - A string path to an Excel file
+            string_list (List[str]): List of column names to process
+            save_path (str): Path where the output CSV will be saved
+            input_type (Optional[str]): Type of input ('csv', 'excel', 'dataframe').
+                                      If None, will try to infer from file extension.
+
+        Returns:
+            tuple: (results, processed_dataframe)
+
+        Examples:
+            # Using with an Excel file
+            results, df = handler.run_judgment_pipeline(
+                'data.xlsx',
+                ['col1', 'col2'],
+                'output.csv'
+            )
+
+            # Using with a DataFrame, explicit type
+            results, df = handler.run_judgment_pipeline(
+                my_dataframe,
+                ['col1', 'col2'],
+                'output.csv',
+                input_type='dataframe'
+            )
+        """
+        df = self.read_input(input_source, input_type)
+        self.specify_columns(string_list)
         df_new = self.decompose_df(df)
-        res =  self.process_df(df_new)
-        df_new = self.create_judgment_df(res,df_new)
-        self.save_df(df_new,save_path)
-        
-        return res,df_new
+        res = self.process_df(df_new)
+        df_new = self.create_judgment_df(res, df_new)
+        self.save_df(df_new, save_path)
+        return res, df_new
 
     
     def create_judgment_df(self,results,df):
