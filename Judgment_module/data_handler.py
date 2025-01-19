@@ -186,10 +186,15 @@ class DataHandler:
                     if not columns or len(columns) != 2:
                         raise ValueError("The 'columns' parameter must be a list containing exactly two column names [statement_1, statement_2].")
                     self.columns.extend(columns)
+                if self.judgment.option == "ground_truth_judgment":
+                    if not columns or len(columns) != 2:
+                        raise ValueError("The 'columns' parameter must be a list containing exactly two column names [statement_1, ground_truth].")
+                    self.columns.extend(columns)
                 else:
                     if not columns or len(columns) != 1:
                         raise ValueError("The 'columns' parameter must be a list containing exactly one column name.[statement]")
                     self.columns.extend(columns)
+
 
             
             

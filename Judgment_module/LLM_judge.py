@@ -266,10 +266,17 @@ class JudgmentLLM(LLM):
             if self.option == "discrepancy_judgment":
                 if len(text) != 2:
                     raise ValueError(
-                        "this option requires exactly two strings: [statement_1, statement_2]"
+                        f"this {self.option} requires exactly two strings: [statement_1, statement_2]"
                     )
                 return f'''the text of User1 input is: \n \n {text[0]}
                 the text of User2 is: \n \n {text[1]}'''
+            if self.option == "ground_truth_judgment":
+                if len(text) != 2:
+                    raise ValueError(
+                        f"this {self.option} requires exactly two strings: [statement_1, ground_truth]"
+                    )
+                return f'''the answer of User is: \n \n {text[0]} \n \n
+                the Ground truth is: \n \n {text[1]}'''
             else:
                 if len(text) != 1:
                     raise ValueError(
