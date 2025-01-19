@@ -6,3 +6,5 @@ amin_llm_as_a_judge.ipynb
 
 # Ignore all .pyc files
 *.pyc
+
+*.csv
