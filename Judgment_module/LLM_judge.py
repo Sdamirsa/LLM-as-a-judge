@@ -283,3 +283,41 @@ class JudgmentLLM(LLM):
                         f"{self.option} requires exactly one string in the text list"
                     )
                 return text[0]
+            
+
+
+    def display_prompt_format(self) -> None:
+        """
+        Displays the current system prompt and expected user prompt format for debugging purposes.
+        This helps users understand how to structure their input and what instructions the LLM is following.
+        """
+        # Display the system prompt
+        print("=== Current System Prompt ===")
+        print(self.system_prompt)
+        print("\n=== Grading Type ===")
+        print(f"Using grading type: {self.grading_type}")
+        print(f"Grading prompt: {self.grading_prompt}")
+        print("\n=== Expected User Prompt Format ===")
+        
+        # Display the expected format based on the current option and user_prompt setting
+        print("Required input format:")
+        if self.user_prompt:
+            if self.option == "discrepancy_judgment":
+                print("List of 3 strings: [user_1_input, user_2_input, argument]")
+                print("Example usage: judge.generate_judgment(['User1 statement', 'User2 statement', 'General argument'])")
+            else:
+                print("List of 2 strings: [general_statement, user_input]")
+                print("Example usage: judge.generate_judgment(['General statement', 'User input'])")
+        else:
+            if self.option == "discrepancy_judgment":
+                print("List of 2 strings: [statement_1, statement_2]")
+                print("Example usage: judge.generate_judgment(['Statement 1', 'Statement 2'])")
+            elif self.option == "ground_truth_judgment":
+                print("List of 2 strings: [statement_1, ground_truth]")
+                print("Example usage: judge.generate_judgment(['User answer', 'Ground truth'])")
+            else:
+                print("List of 1 string: [statement]")
+                print("Example usage: judge.generate_judgment(['Statement to evaluate'])")
+        
+        print("\n=== Response Format ===")
+        print(f"Response will be parsed according to: {self.response_model.__name__}")
