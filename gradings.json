@@ -1,0 +1,7 @@
+{
+    "boolean": "generate a total score: True (acceptable) or False (unacceptable).",
+    "1_to_4": "generate a total score from these options: 4 (totally acceptable), 3 (mostly acceptable), 2 (mostly unacceptable), 1 (totally unacceptable).",
+    "bad_good_best_fit": "generate a total score from these options: (Best Fit), (Good Fit), (Poor Fit).",
+    "pass_borderline_fail": "generate a total score from these options: Pass (acceptable), Borderline (marginal, needs revision), Fail (unacceptable).",
+    "likert_scale_1_to_5": "generate a total score from these options Based on likert scale: 1 (Strongly Disagree), 2 (Disagree), 3 (Neutral), 4 (Agree), 5 (Strongly Agree)."
+}
