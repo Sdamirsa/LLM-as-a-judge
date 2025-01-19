@@ -185,6 +185,8 @@ class JudgmentLLM(LLM):
                 model=self.model,
                 messages=self.messages,
                 response_format=self.response_model,
+                logprobs=True,
+                top_logprobs=5
             )
             if self.verbose:
                 return response  # Return full response object for debugging
@@ -252,6 +254,8 @@ class JudgmentLLM(LLM):
                 model=self.model,
                 messages=self.messages,
                 response_format=self.response_model,
+                logprobs=True,
+                top_logprobs=5
             )
             if self.verbose:
                 return response  # Return full response object
