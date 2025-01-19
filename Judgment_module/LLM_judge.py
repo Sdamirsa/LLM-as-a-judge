@@ -53,7 +53,8 @@ class JudgmentLLM(LLM):
         max_tokens: int = 2048,
         option: str = None,
         user_prompt: bool = False,
-        grading_type: str = None):
+        grading_type: str = None,
+        system_prompt: str = None):
         """
         Initializes the JudgmentLLM object.
 
@@ -73,11 +74,13 @@ class JudgmentLLM(LLM):
         self.user_prompt = user_prompt
         self.grading_type = self._validate_grading_type(grading_type)
         self.grading_prompt = self.GRADING_PROMPTS[self.grading_type]
-
+        self.system_prompt = system_prompt
         if not user_prompt:
-            self.system_prompt = self.PROMPTS[self.option]
+            if self.system_prompt is None:
+                self.system_prompt = self.PROMPTS[self.option]
         else:
-            self.system_prompt = self.PROMPTS[f'{self.option}_with_user_prompt']
+            if self.system_prompt is None:
+                self.system_prompt = self.PROMPTS[f'{self.option}_with_user_prompt']
         self.response_model = self._get_response_model(self.grading_type)
         
 
