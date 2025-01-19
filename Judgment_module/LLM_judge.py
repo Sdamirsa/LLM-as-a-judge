@@ -56,7 +56,8 @@ class JudgmentLLM(LLM):
     grading_type: str = None,
     system_prompt: str = None,
     add_to_system_prompt: str = None,
-    few_shot_examples: str = None  # New parameter for few-shot examples
+    few_shot_examples: str = None,  # New parameter for few-shot examples
+    verbose: bool = False, 
     ):
         """
         Initializes the JudgmentLLM object.
@@ -75,6 +76,7 @@ class JudgmentLLM(LLM):
             ValueError: If the 'option' is invalid or if both system_prompt and add_to_system_prompt are provided.
         """
         super().__init__(api_key=api_key, model=model, temperature=temperature, max_tokens=max_tokens)
+        self.verbose = verbose
         self.load_prompts()
         self.option = self._validate_option(option)
         
@@ -184,6 +186,8 @@ class JudgmentLLM(LLM):
                 messages=self.messages,
                 response_format=self.response_model,
             )
+            if self.verbose:
+                return response  # Return full response object for debugging
             return response.choices[0].message.parsed
         except Exception as e:
             logger.error(f"Error during judgment task: {e}")
@@ -249,6 +253,8 @@ class JudgmentLLM(LLM):
                 messages=self.messages,
                 response_format=self.response_model,
             )
+            if self.verbose:
+                return response  # Return full response object
             return response.choices[0].message.parsed
         except Exception as e:
             logger.error(f"Error during judgment task: {e}")

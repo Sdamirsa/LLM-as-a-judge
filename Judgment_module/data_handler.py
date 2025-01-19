@@ -352,8 +352,15 @@ class DataHandler:
     
     def create_judgment_df(self,results,df):
         new_df = df.copy()
-        new_df['judgment_reasoning'] = [item.reasoning for item in results]
-        new_df['judgment_total_score'] = [item.total_score.value for item in results]
+        if self.judgment.verbose:
+            # For verbose mode, handle full response objects
+            new_df['judgment_reasoning'] = [item.choices[0].message.parsed.reasoning for item in results]
+            new_df['judgment_total_score'] = [item.choices[0].message.parsed.total_score.value for item in results]
+            new_df['raw_response'] = [str(item) for item in results]  # Add raw response column
+        else:
+            # Normal mode, handle parsed responses
+            new_df['judgment_reasoning'] = [item.reasoning for item in results]
+            new_df['judgment_total_score'] = [item.total_score.value for item in results]
         return new_df
 
 
