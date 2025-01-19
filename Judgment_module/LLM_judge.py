@@ -55,7 +55,9 @@ class JudgmentLLM(LLM):
     user_prompt: bool = False,
     grading_type: str = None,
     system_prompt: str = None,
-    add_to_system_prompt: str = None):
+    add_to_system_prompt: str = None,
+    few_shot_examples: str = None  # New parameter for few-shot examples
+    ):
         """
         Initializes the JudgmentLLM object.
 
@@ -96,7 +98,12 @@ class JudgmentLLM(LLM):
             self.system_prompt = f"{base_prompt}\n\n{add_to_system_prompt}"
         else:
             self.system_prompt = base_prompt
-            
+        
+        # Append few-shot examples to the system prompt if provided
+        if few_shot_examples is not None:
+            self.system_prompt += f"\n\nhere are some examples for your guidance:"
+            self.system_prompt += f"\n{few_shot_examples}"
+                
         self.response_model = self._get_response_model(self.grading_type)
             
 
