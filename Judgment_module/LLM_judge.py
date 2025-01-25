@@ -357,3 +357,82 @@ class JudgmentLLM(LLM):
         
         print("\n=== Response Format ===")
         print(f"Response will be parsed according to: {self.response_model.__name__}")
+
+    async def run_judgment_async_batches(
+    self,
+    texts: List[List[str]],
+    batch_size: int = 5,
+    system_prompt: Optional[str] = None,
+    delay_between_batches: float = 0
+) -> List[Any]:
+        """
+        Process multiple judgment tasks in batches asynchronously.
+
+        Args:
+            texts (List[List[str]]): List of text inputs, where each inner list contains the strings
+                                    required for the judgment type.
+            batch_size (int): Number of tasks to process in each batch. Defaults to 5.
+            system_prompt (Optional[str]): Optional system prompt to override the default.
+                                        Defaults to None.
+            delay_between_batches (float): Optional delay between batches in seconds.
+                                        Defaults to 0.
+
+        Returns:
+            List[Any]: List of judgment results for all processed texts.
+
+        Raises:
+            ValueError: If the input format is invalid.
+        """
+        if not texts or not isinstance(texts, list):
+            raise ValueError("texts must be a non-empty list of text lists")
+
+        all_results = []
+        total_items = len(texts)
+        
+        try:
+            for i in range(0, total_items, batch_size):
+                # Calculate the actual batch size for this iteration
+                current_batch_size = min(batch_size, total_items - i)
+                current_batch = texts[i:i + current_batch_size]
+                
+                # Create tasks for the current batch
+                tasks = []
+                for text_list in current_batch:
+                    task = asyncio.create_task(
+                        self.generate_judgment_async(
+                            text=text_list,
+                            system_prompt=system_prompt
+                        )
+                    )
+                    tasks.append(task)
+                
+                # Log progress
+                logger.info(
+                    f"Processing batch {i//batch_size + 1}, "
+                    f"items {i} to {i + current_batch_size} of {total_items}"
+                )
+                
+                # Process the batch
+                batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Handle results and exceptions
+                processed_results = []
+                for result in batch_results:
+                    if isinstance(result, Exception):
+                        logger.error(f"Error in batch processing: {result}")
+                        processed_results.append(None)
+                    else:
+                        processed_results.append(result)
+                        
+                all_results.extend(processed_results)
+                
+                # Add delay between batches if specified
+                if delay_between_batches > 0 and i + batch_size < total_items:
+                    await asyncio.sleep(delay_between_batches)
+                    
+        except Exception as e:
+            logger.error(f"Error during batch processing: {e}")
+            raise
+            
+        return all_results
+
