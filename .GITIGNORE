@@ -1,6 +1,7 @@
 .env
 TODO.md
 amin_llm_as_a_judge.ipynb
+test.ipynb
 # Ignore all __pycache__ directories
 **/__pycache__/
 
