@@ -353,10 +353,25 @@ class DataHandler:
     def create_judgment_df(self,results,df):
         new_df = df.copy()
         if self.judgment.verbose:
-            # For verbose mode, handle full response objects
-            new_df['judgment_reasoning'] = [item.choices[0].message.parsed.reasoning for item in results]
-            new_df['judgment_total_score'] = [item.choices[0].message.parsed.total_score.value for item in results]
-            new_df['raw_response'] = [str(item) for item in results]  # Add raw response column
+            new_df['judgment_reasoning'] = [
+                item.choices[0].message.parsed.reasoning if item and hasattr(item, 'choices') and item.choices 
+                and hasattr(item.choices[0], 'message') and hasattr(item.choices[0].message, 'parsed') 
+                and hasattr(item.choices[0].message.parsed, 'reasoning') 
+                else ["ERROR"] for item in results
+            ]
+
+            new_df['judgment_total_score'] = [
+                item.choices[0].message.parsed.total_score.value if item and hasattr(item, 'choices') and item.choices 
+                and hasattr(item.choices[0], 'message') and hasattr(item.choices[0].message, 'parsed') 
+                and hasattr(item.choices[0].message.parsed, 'total_score') 
+                else "bad_fit" for item in results
+            ]
+
+            new_df['raw_response'] = [
+                str(item) if item is not None 
+                else {"ERROR": "ERROR"} for item in results
+            ]
+
         else:
             # Normal mode, handle parsed responses
             new_df['judgment_reasoning'] = [item.reasoning for item in results]
@@ -397,3 +412,114 @@ class DataHandler:
         except Exception as e:
             logger.error(f"Error while reading the file: {e}")
             raise
+
+    async def run_judgment_pipeline_async_batch(
+    self,
+    input_source: Union[str, pd.DataFrame],
+    string_list: List[str],
+    save_path: str,
+    batch_size: int = 5,
+    delay_between_batches: float = 0,
+    input_type: Optional[str] = None,
+    save_intermediate: bool = False
+) -> tuple:
+        """
+        Run the async judgment pipeline with batch processing.
+
+        Parameters:
+            input_source (Union[str, pd.DataFrame]): The input source (DataFrame or file path)
+            string_list (List[str]): List of column names to process
+            save_path (str): Path where the output CSV will be saved
+            batch_size (int): Number of items to process in each batch
+            delay_between_batches (float): Delay between batches in seconds
+            input_type (Optional[str]): Type of input ('csv', 'excel', 'dataframe')
+            save_intermediate (bool): Whether to save intermediate results after each batch
+
+        Returns:
+            tuple: (all_results, processed_dataframe)
+
+        Examples:
+            # Basic usage
+            results, df = await handler.run_judgment_pipeline_async_batch(
+                'data.csv',
+                ['col1', 'col2'],
+                'output.csv',
+                batch_size=10
+            )
+
+            # With intermediate saves
+            results, df = await handler.run_judgment_pipeline_async_batch(
+                my_dataframe,
+                ['col1', 'col2'],
+                'output.csv',
+                batch_size=5,
+                delay_between_batches=1,
+                save_intermediate=True
+            )
+        """
+        try:
+            # Initial setup
+            df = self.read_input(input_source, input_type)
+            self.specify_columns(string_list)
+            df_new = self.decompose_df(df)
+            
+            all_results = []
+            total_rows = len(df_new)
+            
+            # Process in batches
+            for i in range(0, total_rows, batch_size):
+                # Get current batch
+                current_batch_size = min(batch_size, total_rows - i)
+                batch_df = df_new.iloc[i:i + current_batch_size]
+                
+                logger.info(
+                    f"Processing batch {i//batch_size + 1}, "
+                    f"rows {i} to {i + current_batch_size} of {total_rows}"
+                )
+                print(f"Processing batch {i//batch_size + 1}, rows {i} to {i + current_batch_size } of {total_rows}")
+                # Create tasks for the current batch
+                tasks = []
+                for _, row in batch_df.iterrows():
+                    row_values_list = row.tolist()
+                    task = asyncio.create_task(
+                        self.judgment.generate_judgment_async(row_values_list)
+                    )
+                    tasks.append(task)
+                
+                # Process batch
+                batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Handle results and exceptions
+                processed_results = []
+                for result in batch_results:
+                    if isinstance(result, Exception):
+                        logger.error(f"Error in batch processing: {result}")
+                        processed_results.append(None)
+                    else:
+                        processed_results.append(result)
+                
+                all_results.extend(processed_results)
+                
+                # Save intermediate results if requested
+                if save_intermediate:
+                    interim_df = self.create_judgment_df(
+                        all_results[:i + current_batch_size],
+                        df_new.iloc[:i + current_batch_size]
+                    )
+                    interim_path = f"{os.path.splitext(save_path)[0]}_interim_{i+current_batch_size+2800}.csv"
+                    self.save_df(interim_df, interim_path)
+                
+                # Add delay between batches if specified
+                if delay_between_batches > 0 and i + batch_size < total_rows:
+                    await asyncio.sleep(delay_between_batches)
+            
+            # Create final DataFrame with all results
+            final_df = self.create_judgment_df(all_results, df_new)
+            self.save_df(final_df, save_path)
+            
+            return all_results, final_df
+            
+        except Exception as e:
+            logger.error(f"Error during batch processing pipeline: {e}")
+            raise
+
